@@ -3,6 +3,7 @@
 import os
 import json
 import requests
+import subprocess
 
 KEY = os.environ['AIRTABLE_KEY']
 API_BASE = 'https://api.airtable.com/v0/apph6Hzhk8tmLKXl8/'
@@ -10,53 +11,83 @@ API_BASE = 'https://api.airtable.com/v0/apph6Hzhk8tmLKXl8/'
 api = requests.Session()
 api.headers.update({'Authorization': 'Bearer %s' % KEY})
 
-offset = None
-output = open("images.latex", "wt")
-output.write(
-r"""
-\documentclass{article}
-\usepackage{graphicx}
+def write_book(name):
+    print('Generating %s' % name)
+    offset = None
+    slug = get_slug(name)
+    tex_filename = '%s.tex' % slug
+    output = open(tex_filename, "wt")
+    output.write(
+    r"""
+    \documentclass{article}
+    \usepackage{graphicx}
 
-\begin{document}
+    \begin{document}
 
-""")
+    """)
 
-while True:
-    results = api.get(API_BASE + 'Lakeland Photos ALL', params={'filterByFormula': '(FIND("dligon",{File Paths}))', 'offset': offset}).json()
-    for record in results['records']:
-        fields = record.get('fields', {})
-        url = fields.get('URL')
+    while True:
+        filterf = '(FIND("%s",{Flag for External Identification}))' % name
+        resp = api.get(
+            API_BASE + 'Lakeland Photos ALL', 
+            params={
+                'filterByFormula': filterf,
+                'offset': offset
+            }
+        )
+        results = resp.json()
 
-        if not url:
-            continue
+        for record in results['records']:
+            fields = record.get('fields', {})
+            url = fields.get('URL')
 
-        filename = url.split('/')[-1]
-        path = 'images/' + filename
+            if not url:
+                continue
 
-        if not os.path.isfile(path):
-            with open(path, 'wb') as file:
-                response = requests.get(url)
-                file.write(response.content)
+            filename = url.split('/')[-1]
+            path = 'images/' + filename
 
-        output.write(
-"""
+            if not os.path.isfile(path):
+                with open(path, 'wb') as file:
+                    response = requests.get(url)
+                    file.write(response.content)
 
-\\begin{{figure}}
-    \\includegraphics[width=\\linewidth]{{{path}}}
-    \\caption{{{filename}}}
-    \\label{{{filename}}}
-\\end{{figure}}
+            output.write(
+    """
 
-\\clearpage
+    \\begin{{figure}}
+        \\includegraphics[width=\\linewidth]{{{path}}}
+        \\caption{{{filename}}}
+        \\label{{{filename}}}
+    \\end{{figure}}
 
-""".format(path=path, filename=filename))
+    \\clearpage
 
-    offset = results.get('offset', None)
+    """.format(path=path, filename=filename))
 
-    if offset is None:
-        break
+        offset = results.get('offset', None)
 
-output.write("\end{document}")
-output.close()
+        if offset is None:
+            break
+
+    output.write("\end{document}")
+    output.close()
+
+    proc = subprocess.Popen(['pdflatex', tex_filename], stdout=subprocess.DEVNULL)
+    proc.communicate()
+
+    os.remove(tex_filename)
+    os.remove('%s.log' % slug)
+    os.remove('%s.aux' % slug)
+    os.rename('%s.pdf' % slug, 'books/%s.pdf' % slug)
+
+def get_slug(s):
+    return s.lower().replace('&', '').replace(' ', '-')
+
+write_book('Diane Ligon')
+write_book('George & Sissy Randall')
+write_book('Jean Adams')
+write_book('Delphine Gross')
+
 
 
