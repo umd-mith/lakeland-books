@@ -1,0 +1,25 @@
+\documentclass[titlepage]{article}
+\usepackage{graphicx}
+
+\title{{ '{' + name + '}' }}
+\author{Lakeland Heritage Project}
+\date{{ '{' + date + '}' }}
+
+\begin{document}
+
+\maketitle
+
+{% for image in images %}
+
+\begin{figure}
+    \includegraphics[width=\linewidth]{{ '{' + image.path + '}' }}
+    \caption{{ '{' + image.filename + '}' }}
+    \label{{ '{' + image.filename + '}' }}
+\end{figure}
+
+\clearpage
+
+{% endfor %}
+
+
+\end{document}
